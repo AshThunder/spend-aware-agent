@@ -103,8 +103,22 @@ export const SOURCES: SourceDef[] = [
         const t = o.type.replace(/^0x0*2::/, "0x2::");
         types.set(t, (types.get(t) ?? 0) + 1);
       }
+      const top = balances.slice(0, 5);
+      const infos = await Promise.all(
+        top.map((b) =>
+          sui.stateService.getCoinInfo({ coinType: b.coinType }).then(({ response }) => response, () => null),
+        ),
+      );
       return {
-        balances: balances.map((b) => ({ coinType: b.coinType, raw: b.balance })),
+        balances: top.map((b, i) => {
+          const meta = infos[i]?.metadata;
+          const decimals = meta?.decimals ?? 0;
+          return {
+            coinType: b.coinType,
+            symbol: meta?.symbol ?? b.coinType.split("::").pop(),
+            amount: Number(b.balance) / 10 ** decimals,
+          };
+        }),
         objectCount: owned.hasNextPage ? "50+" : owned.objects.length,
         topObjectTypes: [...types.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([type, count]) => ({ type, count })),
       };

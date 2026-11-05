@@ -81,13 +81,13 @@ function answer(topic: Topic, f: Facts, q: ParsedQuestion): string {
     case "wallet": {
       if (!q.address) return "Please include a full 0x… Sui address in the question.";
       if (f.balances === undefined) return "I could not get wallet data this run.";
-      const balances = (f.balances as { coinType: string; raw: string }[])
-        .map((b) => `${b.coinType.split("::").pop()}: ${b.raw}`)
+      const balances = (f.balances as { symbol: string; amount: number }[])
+        .map((b) => `${n(b.amount)} ${b.symbol}`)
         .join(", ");
       const types = ((f.topObjectTypes as { type: string; count: number }[] | undefined) ?? [])
         .map((t) => `${t.count}× ${t.type.split("::").slice(-2).join("::")}`)
         .join(", ");
-      return `Wallet ${q.address.slice(0, 10)}… holds ${balances || "no coins"} (raw units) and owns ${f.objectCount} objects${types ? `, mostly ${types}` : ""}.`;
+      return `Wallet ${q.address.slice(0, 10)}… holds ${balances || "no coins"} and owns ${f.objectCount} objects${types ? `, mostly ${types}` : ""}.`;
     }
   }
 }
