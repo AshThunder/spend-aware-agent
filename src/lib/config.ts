@@ -16,9 +16,9 @@ export const USDC_COIN_TYPE = IS_MAINNET
   ? "0xdba34672e30cb065b1f93e3ab55318768fd6fef66c15942c9f7cb846e2f900e7::usdc::USDC"
   : "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC";
 
-export const TATUM_RPC_URL = IS_MAINNET
-  ? "https://sui-mainnet.gateway.tatum.io"
-  : "https://sui-testnet.gateway.tatum.io";
+export const TATUM_GRPC_HOST = IS_MAINNET
+  ? "sui-mainnet-grpc.gateway.tatum.io:443"
+  : "sui-testnet-grpc.gateway.tatum.io:443";
 
 export const FACILITATOR_URL = process.env.X402_FACILITATOR_URL ?? "https://facilitator.tentaclepay.com";
 

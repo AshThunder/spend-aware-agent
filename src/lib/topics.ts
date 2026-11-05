@@ -5,7 +5,7 @@ export const TOPICS: Record<Topic, { label: string; requiredFacts: string[] }> =
     label: "Network health",
     requiredFacts: ["checkpoint", "checkpointAgeSec", "totalTransactions", "referenceGasPrice", "epoch"],
   },
-  wallet: { label: "Wallet lookup", requiredFacts: ["balances", "objectCount", "recentTransactions"] },
+  wallet: { label: "Wallet lookup", requiredFacts: ["balances", "objectCount", "topObjectTypes"] },
   token: { label: "Token research", requiredFacts: ["symbol", "name", "decimals", "totalSupply"] },
   staking: { label: "Staking & validators", requiredFacts: ["epoch", "totalStakeSui", "activeValidators", "topValidators"] },
 };

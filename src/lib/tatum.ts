@@ -1,22 +1,25 @@
 import "server-only";
-import { TATUM_RPC_URL, tatumApiKey } from "./config";
+import { SuiGrpcClient } from "@mysten/sui/grpc";
+import { GrpcTransport } from "@protobuf-ts/grpc-transport";
+import { ChannelCredentials } from "@grpc/grpc-js";
+import { IS_MAINNET, TATUM_GRPC_HOST, tatumApiKey } from "./config";
 
-let nextId = 1;
+let client: SuiGrpcClient | undefined;
 
-export async function suiRpc<T = unknown>(method: string, params: unknown[] = []): Promise<T> {
-  const res = await fetch(TATUM_RPC_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": tatumApiKey() },
-    body: JSON.stringify({ jsonrpc: "2.0", id: nextId++, method, params }),
-    cache: "no-store",
+// Tatum's Sui gateway speaks native gRPC (not gRPC-web), so the default SuiGrpcClient transport can't be used.
+export function tatumSui(): SuiGrpcClient {
+  client ??= new SuiGrpcClient({
+    network: IS_MAINNET ? "mainnet" : "testnet",
+    transport: new GrpcTransport({
+      host: TATUM_GRPC_HOST,
+      channelCredentials: ChannelCredentials.createSsl(),
+      meta: { "x-api-key": tatumApiKey() },
+    }),
   });
-  if (!res.ok) throw new Error(`Tatum ${method} failed: HTTP ${res.status} ${await res.text()}`);
-  const body = (await res.json()) as { result?: T; error?: { message: string } };
-  if (body.error) throw new Error(`Tatum ${method} failed: ${body.error.message}`);
-  return body.result as T;
+  return client;
 }
 
 export async function usdcBalance(address: string, coinType: string): Promise<number> {
-  const r = await suiRpc<{ totalBalance: string }>("suix_getBalance", [address, coinType]);
-  return Number(r.totalBalance) / 1e6;
+  const { balance } = await tatumSui().getBalance({ owner: address, coinType });
+  return Number(balance.balance) / 1e6;
 }

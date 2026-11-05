@@ -84,8 +84,10 @@ function answer(topic: Topic, f: Facts, q: ParsedQuestion): string {
       const balances = (f.balances as { coinType: string; raw: string }[])
         .map((b) => `${b.coinType.split("::").pop()}: ${b.raw}`)
         .join(", ");
-      const txs = (f.recentTransactions as string[]).length;
-      return `Wallet ${q.address.slice(0, 10)}… holds ${balances || "no coins"} (raw units), owns ${f.objectCount} objects and has ${txs} recent outgoing transaction${txs === 1 ? "" : "s"}.`;
+      const types = ((f.topObjectTypes as { type: string; count: number }[] | undefined) ?? [])
+        .map((t) => `${t.count}× ${t.type.split("::").slice(-2).join("::")}`)
+        .join(", ");
+      return `Wallet ${q.address.slice(0, 10)}… holds ${balances || "no coins"} (raw units) and owns ${f.objectCount} objects${types ? `, mostly ${types}` : ""}.`;
     }
   }
 }

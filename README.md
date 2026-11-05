@@ -35,13 +35,13 @@ On the first run of a topic it buys everything relevant (exploration). From the 
 
 | Piece | Used for |
 | --- | --- |
-| **Tatum Sui RPC** (`sui-mainnet.gateway.tatum.io`) | All on-chain data sold by the sources (checkpoints, gas price, system state, balances, coin metadata, transactions), the wallet balances shown in the UI, and the gRPC client the agent uses to build its x402 payment transactions. |
+| **Tatum Sui gRPC** (`sui-mainnet-grpc.gateway.tatum.io:443`) | All on-chain data sold by the sources (checkpoints, gas price, epoch and validator set, balances, owned objects, coin info), the wallet balances shown in the UI, and the Sui client the agent uses to build its x402 payment transactions. Uses `SuiGrpcClient` from `@mysten/sui` over a native gRPC transport with the `x-api-key` header (`src/lib/tatum.ts`). |
 | **Walrus Memory** (`@mysten-incubation/memwal`, mainnet relayer) | Long-term memory of source evaluations. `recall` before every run, `rememberBulk` + `waitForRememberJobs` after every run. Memories are stored on Walrus and owned by a Sui account. |
 | **x402 on Sui** (`@tentaclepay/sui-x402`, `@x402/next`, `@x402/fetch`) | Each data source is a paywalled Next.js route (`withX402`, settles only after a successful response). The agent pays with `wrapFetchWithPayment`. Settlement goes through the Tentacle Pay facilitator, gas-sponsored, in USDC. |
 
 ## Data sources
 
-All sources serve real data from Tatum's Sui RPC except Alpha Wire, which is a deliberately low-signal seller that claims every topic and returns no verifiable data. It exists to prove the agent learns to stop paying for it.
+All sources serve live Sui mainnet data read through Tatum's gRPC gateway except Alpha Wire, which is a deliberately low-signal seller that claims every topic and returns no verifiable data. It exists to prove the agent learns to stop paying for it.
 
 | Source | Price | Topics |
 | --- | --- | --- |
@@ -59,13 +59,14 @@ Browser ──POST /api/agent──▶ Agent (src/lib/agent.ts)
                                │  recall ───────────────▶ Walrus Memory relayer ─▶ Walrus + Sui
                                │  pay + GET /api/sources/:id  (x402)
                                │        └─▶ withX402 ─▶ Tentacle Pay facilitator ─▶ Sui mainnet (USDC)
-                               │                 └─▶ Tatum Sui RPC (data)
+                               │                 └─▶ Tatum Sui gRPC (data)
                                │  evaluate marginal usefulness
                                └─ rememberBulk ─────────▶ Walrus Memory
 ```
 
 - `src/lib/agent.ts`: planning, purchasing, evaluation, memory writes (streams NDJSON events to the UI)
-- `src/lib/sources.ts`: the paid data sources (Tatum Sui RPC)
+- `src/lib/tatum.ts`: Sui gRPC client on Tatum's gateway
+- `src/lib/sources.ts`: the paid data sources
 - `src/lib/memory.ts`: Walrus Memory client, evaluation encoding/decoding, aggregation
 - `src/app/api/sources/[id]/route.ts`: x402 paywall per source
 - `src/lib/x402-client.ts`: the agent's paying fetch (Tatum gRPC for transaction building)
