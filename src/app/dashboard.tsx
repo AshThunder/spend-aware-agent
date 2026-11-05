@@ -183,7 +183,7 @@ export default function Dashboard({ catalog, examples }: { catalog: CatalogItem[
       </div>
 
       <footer className="mt-12 border-t border-line pt-6 text-xs text-muted">
-        Data: Tatum Sui RPC · Payments: x402 exact scheme on {state?.network ?? "sui:mainnet"} via the Tentacle Pay
+        Data: Tatum Sui gRPC gateway · Payments: x402 exact scheme on {state?.network ?? "sui:mainnet"} via the Tentacle Pay
         facilitator · Memory: Walrus Memory (mainnet relayer). Every purchase is a real USDC transfer.
       </footer>
     </main>
