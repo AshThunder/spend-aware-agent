@@ -5,7 +5,7 @@
 Built for [Total Recall · Tatum × Walrus Memory Hackathon](https://tatum.io/hackathon/total-recall), track **Smart Agents for Real Life**.
 
 - Live demo: [spend-aware-agent.vercel.app](https://spend-aware-agent.vercel.app)
-- Blog post: [blog/spend-aware-agent.md](blog/spend-aware-agent.md)
+- Blog post: [An agent that stops paying for data it already learned was useless](https://dev.to/michris_jb_624f76c2f7151e/an-agent-that-stops-paying-for-data-it-already-learned-was-useless-3ek8)
 - Demo video: _see submission_
 
 ## The problem
