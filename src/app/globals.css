@@ -1,31 +1,41 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0b0d10;
-  --panel: #12161b;
-  --line: #222a33;
-  --ink: #e7ecf2;
-  --muted: #8a96a3;
-  --accent: #5eead4;
-  --warn: #fbbf24;
-  --bad: #f87171;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --raised: #f4f7f7;
+  --soft: #e7f6f4;
+  --line: #e4e7eb;
+  --ink: #14181c;
+  --secondary: #3f4852;
+  --muted: #66707a;
+  --accent: #019d91;
+  --accent-ink: #01645d;
+  --warn: #9a6b12;
+  --bad: #c24141;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-soft: var(--soft);
   --color-line: var(--line);
   --color-ink: var(--ink);
+  --color-secondary: var(--secondary);
   --color-muted: var(--muted);
   --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
   --color-warn: var(--warn);
   --color-bad: var(--bad);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-dm);
   --font-mono: var(--font-geist-mono);
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
+  overflow-anchor: none;
 }
 
 body {
@@ -33,7 +43,47 @@ body {
   color: var(--ink);
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-dm), sans-serif;
+}
+
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
+}
+
+::selection {
+  background: var(--soft);
+  color: var(--ink);
+}
+
+textarea,
+select {
+  caret-color: var(--ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d5dbdf transparent;
+}
+
+.site-header-stick {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  container-name: site-header;
+  container-type: scroll-state;
+}
+
+.site-header {
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+@container site-header scroll-state(stuck: top) {
+  .site-header {
+    box-shadow: 0 8px 24px rgb(20 24 28 / 0.06);
+  }
 }

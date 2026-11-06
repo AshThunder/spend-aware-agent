@@ -4,8 +4,8 @@
 
 Built for [Total Recall · Tatum × Walrus Memory Hackathon](https://tatum.io/hackathon/total-recall), track **Smart Agents for Real Life**.
 
-- Live demo: _see submission_
-- Blog post: _see submission_
+- Live demo: [spend-aware-agent.vercel.app](https://spend-aware-agent.vercel.app)
+- Blog post: [blog/spend-aware-agent.md](blog/spend-aware-agent.md)
 - Demo video: _see submission_
 
 ## The problem
