@@ -61,3 +61,14 @@ export async function countMemories(maxPages = 10): Promise<number> {
   }
   return total;
 }
+
+/** Public identity of the Walrus Memory account: the account object ID and the delegate PUBLIC key. Never the private key. */
+export async function memoryIdentity(): Promise<{ accountId: string; delegatePublicKey: string } | undefined> {
+  try {
+    const accountId = process.env.MEMWAL_ACCOUNT_ID;
+    if (!accountId) return undefined;
+    return { accountId, delegatePublicKey: await memory().getPublicKeyHex() };
+  } catch {
+    return undefined;
+  }
+}

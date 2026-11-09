@@ -20,6 +20,7 @@ export type AppState = {
   agent: { address: string; usdc: number | null; url: string };
   seller: { address: string; usdc: number | null; url: string };
   memory: {
+    account?: { accountId: string; delegatePublicKey: string };
     error?: string;
     namespace: string;
     stored: number | null;

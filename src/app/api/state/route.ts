@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { CATALOG } from "@/lib/catalog";
 import { MEMWAL_NAMESPACE, NETWORK, USDC_COIN_TYPE, explorerAccount, explorerTx, sellerAddress } from "@/lib/config";
 import { aggregate, reconstructRuns, summarize, verdictFor } from "@/lib/learning";
-import { countMemories, recallEvaluations } from "@/lib/memory";
+import { countMemories, memoryIdentity, recallEvaluations } from "@/lib/memory";
 import { usdcBalance } from "@/lib/tatum";
 import { TOPICS, type Topic } from "@/lib/topics";
 import { agentPayments } from "@/lib/x402-client";
@@ -55,6 +55,7 @@ async function build() {
     memory: {
       error: recalled instanceof Error ? recalled.message : undefined,
       namespace: MEMWAL_NAMESPACE,
+      account: await memoryIdentity(),
       stored: listed,
       readable: evals.length,
       items: evals.map((e) => ({ ...e, txUrl: e.tx ? explorerTx(e.tx) : undefined })),
