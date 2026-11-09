@@ -18,7 +18,7 @@ export default function SpendChart({ runs, highlight }: { runs: RunSummary[]; hi
   const BAR = 14;
   const GAP = 6;
   const GROUP_GAP = 28;
-  const LEFT = 44;
+  const LEFT = 64;
   const y = (v: number) => TOP + H - (v / max) * H;
   const { placed, width } = layout(groups, { BAR, GAP, GROUP_GAP, start: LEFT + 12 });
   const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => Number((i * step).toFixed(3)));
@@ -26,7 +26,7 @@ export default function SpendChart({ runs, highlight }: { runs: RunSummary[]; hi
   return (
     <figure className="m-0">
       <svg
-        viewBox={`0 0 ${width} ${TOP + H + 40}`}
+        viewBox={`0 0 ${width} ${TOP + H + 46}`}
         className="block h-auto w-full"
         role="img"
         aria-labelledby="spend-chart-title spend-chart-desc"
@@ -40,7 +40,7 @@ export default function SpendChart({ runs, highlight }: { runs: RunSummary[]; hi
         {ticks.map((t) => (
           <g key={t}>
             <line x1={LEFT} x2={width} y1={y(t)} y2={y(t)} className="stroke-line" strokeWidth={1} />
-            <text x={LEFT - 6} y={y(t) + 4} textAnchor="end" className="fill-muted font-mono text-[10px]">
+            <text x={LEFT - 6} y={y(t) + 4} textAnchor="end" className="fill-muted font-mono text-[13px]">
               {usd(t)}
             </text>
           </g>
@@ -70,10 +70,10 @@ export default function SpendChart({ runs, highlight }: { runs: RunSummary[]; hi
                 </g>
               );
             })}
-            <text x={g.start} y={TOP + H + 18} className="fill-secondary text-[11px]">
+            <text x={g.start} y={TOP + H + 20} className="fill-secondary text-[15px]">
               {TOPIC_SHORT[g.topic]}
             </text>
-            <text x={g.start} y={TOP + H + 32} className="fill-muted font-mono text-[10px]">
+            <text x={g.start} y={TOP + H + 38} className="fill-muted font-mono text-[13px]">
               {g.runs.length} run{g.runs.length === 1 ? "" : "s"}
             </text>
           </g>
@@ -106,7 +106,7 @@ function layout(
       x += o.BAR + o.GAP;
       return { r, x: bx };
     });
-    const end = Math.max(x - o.GAP, start + 64);
+    const end = Math.max(x - o.GAP, start + 72);
     x = end + o.GROUP_GAP;
     return { ...g, start, end, bars };
   });
