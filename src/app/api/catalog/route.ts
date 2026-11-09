@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { SOURCES } from "@/lib/sources";
+import { CATALOG } from "@/lib/catalog";
 
 export function GET() {
-  return NextResponse.json(
-    SOURCES.map(({ id, name, priceUsd, topics, pitch }) => ({ id, name, priceUsd, topics, pitch })),
-  );
+  return NextResponse.json(CATALOG);
 }

@@ -1,89 +1,133 @@
 @import "tailwindcss";
 
+/* Bookkeeper's ledger: warm paper, ink, two stamp colors that mean money well spent and money wasted. */
 :root {
-  --bg: #ffffff;
-  --panel: #ffffff;
-  --raised: #f4f7f7;
-  --soft: #e7f6f4;
-  --line: #e4e7eb;
-  --ink: #14181c;
-  --secondary: #3f4852;
-  --muted: #66707a;
-  --accent: #019d91;
-  --accent-ink: #01645d;
-  --warn: #9a6b12;
-  --bad: #c24141;
+  --paper: #f7f4ee;
+  --card: #fdfbf7;
+  --raised: #efe9df;
+  --line: rgb(31 27 22 / 0.12);
+  --ink: #1f1b16;
+  --secondary: #5e554a;
+  --muted: #736a5e;
+  --good: #1d6b4f;
+  --good-ink: #17573f;
+  --bad: #b23a2a;
 }
 
 @theme inline {
-  --color-bg: var(--bg);
-  --color-panel: var(--panel);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
   --color-raised: var(--raised);
-  --color-soft: var(--soft);
   --color-line: var(--line);
   --color-ink: var(--ink);
   --color-secondary: var(--secondary);
   --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-warn: var(--warn);
+  --color-good: var(--good);
+  --color-good-ink: var(--good-ink);
   --color-bad: var(--bad);
-  --font-sans: var(--font-body);
-  --font-display: var(--font-dm);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-serif);
+  --font-mono: var(--font-figures);
 }
 
 html {
   color-scheme: light;
-  overflow-anchor: none;
 }
 
 body {
-  background: var(--bg);
+  background: var(--paper);
   color: var(--ink);
 }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-dm), sans-serif;
-}
-
 :focus-visible {
-  outline: 2px solid var(--accent-ink);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--soft);
+  background: var(--raised);
   color: var(--ink);
 }
 
-textarea,
-select {
-  caret-color: var(--ink);
+@layer components {
+  .btn-primary {
+    display: inline-flex;
+    height: 44px;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    background: var(--ink);
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--paper);
+    transition: background-color 150ms ease-out, transform 100ms ease-out;
+  }
+  .btn-primary:hover {
+    background: #3a332b;
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+  .btn-primary:disabled {
+    background: var(--muted);
+    cursor: progress;
+  }
+  .btn-secondary {
+    display: inline-flex;
+    height: 44px;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--card);
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    transition: background-color 150ms ease-out;
+  }
+  .btn-secondary:hover {
+    background: var(--raised);
+  }
+  .btn-secondary:disabled {
+    color: var(--muted);
+    cursor: progress;
+  }
+  .link {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--line);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 150ms ease-out;
+  }
+  .link:hover {
+    text-decoration-color: var(--ink);
+  }
+  /* Signature: receipt leaders between an item and its price. */
+  .leader {
+    flex: 1;
+    min-width: 16px;
+    align-self: flex-end;
+    margin: 0 8px 5px;
+    border-bottom: 1px dotted rgb(31 27 22 / 0.35);
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--card);
+  }
 }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #d5dbdf transparent;
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 240ms ease-out both;
+  }
 }
 
-.site-header-stick {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  container-name: site-header;
-  container-type: scroll-state;
-}
-
-.site-header {
-  background: #fff;
-  border-bottom: 1px solid var(--line);
-}
-
-@container site-header scroll-state(stuck: top) {
-  .site-header {
-    box-shadow: 0 8px 24px rgb(20 24 28 / 0.06);
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
 }

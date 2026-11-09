@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of runAgent(question.trim().slice(0, 300), Number(budgetUsd ?? 0.03), request)) {
+        for await (const event of runAgent(question.trim().slice(0, 300), Number.isFinite(Number(budgetUsd)) ? Number(budgetUsd) : 0.03, request)) {
           controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
         }
       } catch (err) {

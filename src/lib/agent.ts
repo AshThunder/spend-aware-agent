@@ -1,61 +1,31 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { type CatalogItem } from "./catalog";
 import { MAX_RUN_BUDGET_USD, appUrl, explorerTx } from "./config";
 import type { AgentEvent } from "./events";
-import { aggregate, encodeEval, memory, recallTopic, type SourceEval } from "./memory";
-import { SOURCES, type Facts, type SourceDef } from "./sources";
+import { aggregate, encodeEval, evaluate, planPurchases, type Facts, type SourceEval } from "./learning";
+import { memory, recallTopic } from "./memory";
 import { TOPICS, parseQuestion, type ParsedQuestion, type Topic } from "./topics";
 import { agentPayments } from "./x402-client";
 
-const USELESS_BELOW = 0.25;
-const REEXPLORE_AFTER_MS = 7 * 24 * 3600 * 1000;
-
 const usd = (n: number) => `$${n.toFixed(3)}`;
 
-type Plan = { source: SourceDef; known: boolean; reason: string };
-
-function planPurchases(topic: Topic, stats: ReturnType<typeof aggregate>) {
-  const candidates = SOURCES.filter((s) => s.topics.includes(topic)).sort((a, b) => a.priceUsd - b.priceUsd);
-  const proven: Plan[] = [];
-  const unknown: Plan[] = [];
-  const skipped: { source: SourceDef; reason: string; history: { tries: number; avgUsefulness: number } }[] = [];
-
-  for (const source of candidates) {
-    const s = stats.get(source.id);
-    if (!s) {
-      unknown.push({ source, known: false, reason: "No memory of this source yet. Buying once to learn what it is worth." });
-      continue;
-    }
-    const history = { tries: s.tries, avgUsefulness: s.avgUsefulness };
-    const stale = Date.now() - Date.parse(s.lastAt) > REEXPLORE_AFTER_MS;
-    if (s.avgUsefulness < USELESS_BELOW && !stale) {
-      skipped.push({
-        source,
-        history,
-        reason: `Memory: ${s.tries} purchase${s.tries > 1 ? "s" : ""}, avg usefulness ${s.avgUsefulness.toFixed(2)} for ${topic} questions. Not worth ${usd(source.priceUsd)}.`,
-      });
-    } else if (s.avgUsefulness < USELESS_BELOW) {
-      unknown.push({ source, known: false, reason: "Last checked over a week ago. Re-testing in case it improved." });
-    } else {
-      proven.push({
-        source,
-        known: true,
-        reason: `Memory: avg usefulness ${s.avgUsefulness.toFixed(2)} over ${s.tries} purchase${s.tries > 1 ? "s" : ""} at ${usd(source.priceUsd)}.`,
-      });
-    }
-  }
-  return { candidates, ordered: [...proven, ...unknown], skipped };
+/** What the agent would buy for a question, with and without its memory. Reads memory, spends nothing. */
+export async function previewPlan(question: string) {
+  const q = parseQuestion(question);
+  const { evals, raw } = await recallTopic(q.topic);
+  const stats = aggregate(evals);
+  const withMemory = planPurchases(q.topic, stats);
+  const withoutMemory = planPurchases(q.topic, new Map());
+  const pick = (p: ReturnType<typeof planPurchases>) => ({
+    buy: p.ordered.map((s) => ({ id: s.source.id, name: s.source.name, priceUsd: s.source.priceUsd, reason: s.reason })),
+    skip: p.skipped.map((s) => ({ id: s.source.id, name: s.source.name, priceUsd: s.source.priceUsd, reason: s.reason })),
+    costUsd: Number(p.ordered.reduce((sum, s) => sum + s.source.priceUsd, 0).toFixed(6)),
+  });
+  return { topic: q.topic, memories: raw.length, evaluations: evals.length, withMemory: pick(withMemory), withoutMemory: pick(withoutMemory) };
 }
 
-function evaluate(topic: Topic, facts: Facts, covered: Map<string, string>) {
-  const required = TOPICS[topic].requiredFacts;
-  const provided = required.filter((f) => facts[f] !== undefined && facts[f] !== null);
-  const fresh = provided.filter((f) => !covered.has(f));
-  const redundantWith = provided.length > fresh.length ? covered.get(provided.find((f) => covered.has(f))!) : undefined;
-  return { usefulness: fresh.length / required.length, fresh, redundantWith };
-}
-
-function sourceUrl(base: string, source: SourceDef, q: ParsedQuestion) {
+function sourceUrl(base: string, source: CatalogItem, q: ParsedQuestion) {
   const url = new URL(`/api/sources/${source.id}`, base);
   if (q.address) url.searchParams.set("address", q.address);
   if (q.coinType) url.searchParams.set("coinType", q.coinType);
@@ -100,7 +70,16 @@ export async function* runAgent(question: string, budgetUsd: number, request: Re
   yield { type: "start", runId, question, topic: q.topic, budgetUsd: budget, agent: address };
 
   let t = Date.now();
-  const { evals, raw } = await recallTopic(q.topic);
+  let recalled: Awaited<ReturnType<typeof recallTopic>>;
+  try {
+    recalled = await recallTopic(q.topic);
+  } catch (err) {
+    // Without memory the agent would buy everything blind. Refuse to spend instead.
+    yield { type: "error", message: `Walrus Memory could not be read, so nothing was bought: ${(err as Error).message}` };
+    yield { type: "done", spentUsd: 0, naiveUsd: 0, bought: [], skipped: [] };
+    return;
+  }
+  const { evals, raw } = recalled;
   const stats = aggregate(evals);
   yield { type: "recall", memories: raw.length, evaluations: evals.length, ms: Date.now() - t };
 
@@ -188,6 +167,7 @@ export async function* runAgent(question: string, budgetUsd: number, request: Re
       redundantWith: ev.redundantWith,
       tx,
       at: new Date().toISOString(),
+      run: runId,
     });
   }
 

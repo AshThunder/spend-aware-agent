@@ -8,6 +8,13 @@ Built for [Total Recall · Tatum × Walrus Memory Hackathon](https://tatum.io/ha
 - Blog post: [An agent that stops paying for data it already learned was useless](https://dev.to/chrisgold/an-agent-that-stops-paying-for-data-it-already-learned-was-useless-ao5)
 - Demo video: to be posted on YouTube
 
+## For judges: verify it in two minutes
+
+1. Open the [home page](https://spend-aware-agent.vercel.app). The chart is rebuilt live from the agent's Walrus memories: each bar is one paid mainnet run, green where the purchase added facts, red where it added nothing. First runs on a topic carry red; later runs do not.
+2. Scroll to **Proof on mainnet**. Every row is one memory with its Walrus blob link and the Sui transaction that paid for the purchase it judges. The memory count comes from the Walrus Memory index.
+3. Open the [console](https://spend-aware-agent.vercel.app/console) and press **Preview the plan, free**. It reads memory and shows what the agent will buy next to what a memoryless agent would buy. No payment is made.
+4. Press **Run on mainnet** to watch a real run: recall, skip, pay (with tx link), score, write to Walrus. The trust table marks the rows the run updated.
+
 ## The problem
 
 Agents are starting to buy things on their own: API calls, data feeds, model inference. Pay-per-request protocols like x402 make that easy. What they don't do is make the agent *careful*. A stateless agent pays for the same redundant or worthless source every single time, because it has no memory of having been burned before.
@@ -54,22 +61,39 @@ All sources serve live Sui mainnet data read through Tatum's gRPC gateway except
 
 ## Architecture
 
-```
-Browser ──POST /api/agent──▶ Agent (src/lib/agent.ts)
-                               │  recall ───────────────▶ Walrus Memory relayer ─▶ Walrus + Sui
-                               │  pay + GET /api/sources/:id  (x402)
-                               │        └─▶ withX402 ─▶ Tentacle Pay facilitator ─▶ Sui mainnet (USDC)
-                               │                 └─▶ Tatum Sui gRPC (data)
-                               │  evaluate marginal usefulness
-                               └─ rememberBulk ─────────▶ Walrus Memory
+```mermaid
+flowchart LR
+  UI[Console / home page] -- POST /api/agent --> A[Agent<br/>src/lib/agent.ts]
+  UI -- GET /api/state --> S[State<br/>runs, trust, proof]
+  UI -- POST /api/plan --> P[Plan preview<br/>no payment]
+  A -- 1 recall --> M[(Walrus Memory<br/>mainnet relayer)]
+  A -- 3 pay x402 --> X[/api/sources/:id<br/>withX402 paywall/]
+  X -- settle USDC --> F[Tentacle Pay facilitator] --> SUI[(Sui mainnet)]
+  X -- chain data --> T[Tatum Sui gRPC]
+  A -- tx building --> T
+  A -- 5 rememberBulk --> M
+  S -- recall + listMemories --> M
+  S -- balances --> T
+  P -- recall --> M
 ```
 
-- `src/lib/agent.ts`: planning, purchasing, evaluation, memory writes (streams NDJSON events to the UI)
-- `src/lib/tatum.ts`: Sui gRPC client on Tatum's gateway
-- `src/lib/sources.ts`: the paid data sources
-- `src/lib/memory.ts`: Walrus Memory client, evaluation encoding/decoding, aggregation
-- `src/app/api/sources/[id]/route.ts`: x402 paywall per source
-- `src/lib/x402-client.ts`: the agent's paying fetch (Tatum gRPC for transaction building)
+The loop, step by step: **recall** past verdicts for the topic → **plan** (proven sources first, unknown sources once, sources with average usefulness under 0.25 skipped, bad verdicts re-tested after 7 days) → **pay** with x402 → **score** marginal usefulness → **remember** one verdict per purchase. If Walrus Memory cannot be read, the agent refuses to spend rather than buying blind.
+
+| File | Role |
+| --- | --- |
+| `src/lib/learning.ts` | The learning loop as pure functions: memory encoding, aggregation, planning, scoring, run reconstruction. Unit tested. |
+| `src/lib/agent.ts` | One run: recall, plan, pay, score, remember. Streams NDJSON events to the UI. Also the free plan preview. |
+| `src/lib/memory.ts` | Walrus Memory client: `recall`, `rememberBulk`, `waitForRememberJobs`, `listMemories` for the authoritative count. |
+| `src/lib/tatum.ts` | `SuiGrpcClient` on Tatum's native gRPC gateway with the `x-api-key` header, throttled to the plan's 3 rps with retry on 429. |
+| `src/lib/sources.ts`, `src/lib/catalog.ts` | The paid sources: prices and topics (catalog) and their Tatum-backed fetchers. |
+| `src/app/api/sources/[id]/route.ts` | x402 paywall per source (`withX402`, settles only after a successful response). |
+| `src/app/api/state/route.ts` | Runs, trust table, memory proof and wallet balances for the UI, cached for 15 s. |
+
+Each memory is one line of text, for example:
+
+```
+[source-eval] source=alpha-wire topic=network paid_usd=0.008 usefulness=0.00 new_facts=0/5 redundant_with=- tx=<sui digest> at=2026-11-05T14:34:50.365Z run=3f9a1c2e
+```
 
 ## Run it locally
 
@@ -93,6 +117,14 @@ pnpm dev
 pnpm tsx --env-file=.env.local scripts/smoke.mts   # checks Tatum, Walrus Memory and a full paid run
 ```
 
+Tests cover the learning loop (memory round-trip, planning, re-testing stale verdicts, marginal scoring, run reconstruction):
+
+```bash
+pnpm test
+```
+
+For UI work without keys, point `/api/state` at a saved snapshot (ignored in production): `STATE_FIXTURE=path/to/state.json pnpm dev`.
+
 Optional: `SUI_NETWORK=sui:testnet`, `MAX_RUN_BUDGET_USD` (default 0.05), `RUNS_PER_HOUR` (default 30).
 
 ## Limits and honest notes
@@ -100,7 +132,8 @@ Optional: `SUI_NETWORK=sui:testnet`, `MAX_RUN_BUDGET_USD` (default 0.05), `RUNS_
 - Usefulness scoring is deterministic (required facts per topic, marginal over cheaper purchases), not an LLM judge. This keeps the learning loop transparent and reproducible.
 - The agent and the sellers are both run by this demo, so the USDC moves between two demo wallets. The payments are nonetheless real mainnet x402 settlements.
 - With the default relayer, Walrus Memory's relayer sees memory plaintext. Evaluations contain no personal data.
-- The public demo is rate-limited and budget-capped per run.
+- The public demo is rate-limited and budget-capped per run. The limiter is in memory, so it is per server instance, not global.
+- Memories written before Nov 9 carry no run id. The UI groups those into runs by topic and time (purchases under two minutes apart). Newer memories carry `run=<id>`.
 
 ## License
 

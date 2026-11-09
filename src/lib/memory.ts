@@ -1,96 +1,63 @@
 import "server-only";
 import { MemWal } from "@mysten-incubation/memwal";
 import { MEMWAL_NAMESPACE, MEMWAL_RELAYER_URL } from "./config";
+import { decodeEval, type SourceEval } from "./learning";
 import type { Topic } from "./topics";
+
+export { aggregate, decodeEval, encodeEval, type SourceEval, type SourceStats } from "./learning";
 
 let client: MemWal | undefined;
 
 export function memory() {
   const key = process.env.MEMWAL_PRIVATE_KEY;
   const accountId = process.env.MEMWAL_ACCOUNT_ID;
-  if (!key || !accountId) throw new Error("Missing MEMWAL_PRIVATE_KEY or MEMWAL_ACCOUNT_ID");
+  if (!key || !accountId) throw new Error("Walrus Memory is not configured (MEMWAL_PRIVATE_KEY, MEMWAL_ACCOUNT_ID)");
   client ??= MemWal.create({ key, accountId, serverUrl: MEMWAL_RELAYER_URL, namespace: MEMWAL_NAMESPACE });
   return client;
 }
 
-export type SourceEval = {
-  source: string;
-  topic: Topic;
-  paidUsd: number;
-  usefulness: number;
-  newFacts: number;
-  requiredFacts: number;
-  redundantWith?: string;
-  tx?: string;
-  at: string;
-};
-
-export function encodeEval(e: SourceEval): string {
-  return [
-    "[source-eval]",
-    `source=${e.source}`,
-    `topic=${e.topic}`,
-    `paid_usd=${e.paidUsd}`,
-    `usefulness=${e.usefulness.toFixed(2)}`,
-    `new_facts=${e.newFacts}/${e.requiredFacts}`,
-    `redundant_with=${e.redundantWith ?? "-"}`,
-    `tx=${e.tx ?? "-"}`,
-    `at=${e.at}`,
-  ].join(" ");
-}
-
-const EVAL_RE =
-  /\[source-eval\] source=(\S+) topic=(\S+) paid_usd=(\S+) usefulness=(\S+) new_facts=(\d+)\/(\d+) redundant_with=(\S+) tx=(\S+) at=(\S+)/;
-
-export function decodeEval(text: string): SourceEval | null {
-  const m = text.match(EVAL_RE);
-  if (!m) return null;
-  return {
-    source: m[1],
-    topic: m[2] as Topic,
-    paidUsd: Number(m[3]),
-    usefulness: Number(m[4]),
-    newFacts: Number(m[5]),
-    requiredFacts: Number(m[6]),
-    redundantWith: m[7] === "-" ? undefined : m[7],
-    tx: m[8] === "-" ? undefined : m[8],
-    at: m[9],
-  };
-}
-
 export type RecalledMemory = { text: string; blobId: string; createdAt?: string };
+export type EvalMemory = SourceEval & { blobId: string; createdAt?: string };
+
+const toRecalled = (r: { text: string; blob_id: string; created_at?: string }): RecalledMemory => ({
+  text: r.text,
+  blobId: r.blob_id,
+  createdAt: r.created_at,
+});
 
 export async function recallTopic(topic: Topic, limit = 100): Promise<{ evals: SourceEval[]; raw: RecalledMemory[] }> {
   const res = await memory().recall({
     query: `source-eval topic=${topic} usefulness of paid data sources for ${topic} questions`,
     limit,
   });
-  const raw = res.results.map((r) => ({ text: r.text, blobId: r.blob_id, createdAt: r.created_at }));
-  const evals = raw
-    .map((r) => decodeEval(r.text))
-    .filter((e): e is SourceEval => !!e && e.topic === topic);
+  const raw = res.results.map(toRecalled);
+  const evals = raw.map((r) => decodeEval(r.text)).filter((e): e is SourceEval => !!e && e.topic === topic);
   return { evals, raw };
 }
 
-export async function recallRecent(limit = 30): Promise<RecalledMemory[]> {
-  const res = await memory().recall({ query: "source-eval lesson paid data source", limit: 100 });
-  return res.results
-    .map((r) => ({ text: r.text, blobId: r.blob_id, createdAt: r.created_at }))
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-    .slice(0, limit);
+/** Every source evaluation the agent can read back, newest first, with its Walrus blob id. */
+export async function recallEvaluations(limit = 200): Promise<EvalMemory[]> {
+  const res = await memory().recall({ query: "source-eval lesson paid data source usefulness", limit });
+  const seen = new Set<string>();
+  const out: EvalMemory[] = [];
+  for (const r of res.results.map(toRecalled)) {
+    const e = decodeEval(r.text);
+    if (!e || seen.has(r.blobId)) continue;
+    seen.add(r.blobId);
+    out.push({ ...e, blobId: r.blobId, createdAt: r.createdAt });
+  }
+  return out.sort((a, b) => b.at.localeCompare(a.at));
 }
 
-export type SourceStats = { source: string; tries: number; avgUsefulness: number; avgPaid: number; lastAt: string };
-
-export function aggregate(evals: SourceEval[]): Map<string, SourceStats> {
-  const out = new Map<string, SourceStats>();
-  for (const e of evals) {
-    const s = out.get(e.source) ?? { source: e.source, tries: 0, avgUsefulness: 0, avgPaid: 0, lastAt: e.at };
-    s.avgUsefulness = (s.avgUsefulness * s.tries + e.usefulness) / (s.tries + 1);
-    s.avgPaid = (s.avgPaid * s.tries + e.paidUsd) / (s.tries + 1);
-    s.tries += 1;
-    if (e.at > s.lastAt) s.lastAt = e.at;
-    out.set(e.source, s);
+/** Authoritative count of memories stored in this namespace, walked page by page from the relayer index. */
+export async function countMemories(maxPages = 10): Promise<number> {
+  let cursor: string | undefined;
+  let total = 0;
+  for (let page = 0; page < maxPages; page++) {
+    const res = await memory().listMemories({ cursor, limit: 500, namespace: MEMWAL_NAMESPACE });
+    total += res.memories.filter((m) => m.status !== "deleted").length;
+    if (!res.has_more || !res.next_cursor) break;
+    cursor = res.next_cursor;
   }
-  return out;
+  return total;
 }

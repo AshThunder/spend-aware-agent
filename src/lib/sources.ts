@@ -1,19 +1,12 @@
 import "server-only";
 import { tatumSui } from "./tatum";
 import { USDC_COIN_TYPE } from "./config";
-import type { Topic } from "./topics";
+import { CATALOG, type CatalogItem } from "./catalog";
+import type { Facts } from "./learning";
 
 export type SourceParams = { address?: string; coinType?: string };
-export type Facts = Record<string, unknown>;
-
-export type SourceDef = {
-  id: string;
-  name: string;
-  priceUsd: number;
-  topics: Topic[];
-  pitch: string;
-  fetch: (p: SourceParams) => Promise<Facts>;
-};
+export type { Facts };
+export type SourceDef = CatalogItem & { fetch: (p: SourceParams) => Promise<Facts> };
 
 const MIST_PER_SUI = 1_000_000_000n;
 
@@ -37,33 +30,13 @@ async function networkFacts(): Promise<Facts> {
   };
 }
 
-export const SOURCES: SourceDef[] = [
-  {
-    id: "chain-pulse",
-    name: "Chain Pulse",
-    priceUsd: 0.002,
-    topics: ["network"],
-    pitch: "Latest checkpoint, throughput and gas price straight from a Sui node.",
-    fetch: networkFacts,
-  },
-  {
-    id: "chain-pulse-pro",
-    name: "Chain Pulse Pro",
-    priceUsd: 0.009,
-    topics: ["network", "staking"],
-    pitch: "Premium network intelligence with analyst commentary.",
-    fetch: async () => ({
+const FETCHERS: Record<string, SourceDef["fetch"]> = {
+  "chain-pulse": networkFacts,
+  "chain-pulse-pro": async () => ({
       ...(await networkFacts()),
       analystNote: "Network conditions remain constructive. Builders should keep building.",
     }),
-  },
-  {
-    id: "staking-scope",
-    name: "Staking Scope",
-    priceUsd: 0.005,
-    topics: ["staking", "network"],
-    pitch: "Validator set, total stake and the largest staking pools.",
-    fetch: async () => {
+  "staking-scope": async () => {
       const { response } = await tatumSui().ledgerService.getEpoch({
         readMask: { paths: ["epoch", "system_state.validators.active_validators", "system_state.validators.total_stake"] },
       });
@@ -84,14 +57,7 @@ export const SOURCES: SourceDef[] = [
         topValidators: top,
       };
     },
-  },
-  {
-    id: "wallet-xray",
-    name: "Wallet X-Ray",
-    priceUsd: 0.004,
-    topics: ["wallet"],
-    pitch: "Balances, object count and what kinds of objects any address owns.",
-    fetch: async ({ address }) => {
+  "wallet-xray": async ({ address }) => {
       if (!address) throw new Error("address is required");
       const sui = tatumSui();
       const [{ balances }, owned] = await Promise.all([
@@ -123,14 +89,7 @@ export const SOURCES: SourceDef[] = [
         topObjectTypes: [...types.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([type, count]) => ({ type, count })),
       };
     },
-  },
-  {
-    id: "token-intel",
-    name: "Token Intel",
-    priceUsd: 0.003,
-    topics: ["token"],
-    pitch: "On-chain metadata and circulating supply for any Sui coin type.",
-    fetch: async ({ coinType }) => {
+  "token-intel": async ({ coinType }) => {
       const type = coinType || USDC_COIN_TYPE;
       const { response } = await tatumSui().stateService.getCoinInfo({ coinType: type });
       const decimals = response.metadata?.decimals ?? 0;
@@ -143,21 +102,15 @@ export const SOURCES: SourceDef[] = [
         totalSupply: supply === undefined ? undefined : Number(supply / 10n ** BigInt(decimals)),
       };
     },
-  },
-  {
-    // Deliberately low-signal seller: claims every topic, returns no verifiable data.
-    id: "alpha-wire",
-    name: "Alpha Wire",
-    priceUsd: 0.008,
-    topics: ["network", "wallet", "token", "staking"],
-    pitch: "Exclusive alpha on everything Sui. Be early.",
-    fetch: async () => ({
+  // Deliberately low-signal seller: claims every topic, returns no verifiable data.
+  "alpha-wire": async () => ({
       headline: "Smart money is watching Sui closely",
       sentiment: "very bullish",
       tip: "Stay tuned for the next big move.",
     }),
-  },
-];
+};
+
+export const SOURCES: SourceDef[] = CATALOG.map((c) => ({ ...c, fetch: FETCHERS[c.id] }));
 
 export function getSource(id: string) {
   return SOURCES.find((s) => s.id === id);
